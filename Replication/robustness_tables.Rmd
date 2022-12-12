@@ -1,0 +1,270 @@
+---
+title: "256 final"
+author: "Adam Mills"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, message = FALSE, warning = FALSE, echo = FALSE}
+library(haven)
+library(tidyverse,warn.conflicts = FALSE)
+library(lfe,warn.conflicts = FALSE)
+library(plm)
+library(sandwich)
+library(car)
+library(MASS)
+library(foreign)
+library(lmtest)
+library(gridExtra)
+library(fastDummies)
+library(AER)
+library(stargazer)
+```
+
+```{r read in the data, echo = FALSE, warning = FALSE}
+data <- read_dta("Data/20140162_Data.dta")
+INEC <- read_dta("Data/20140162_INEC.DTA")
+```
+
+
+```{r table a1, echo = FALSE, warning=FALSE, message = FALSE}
+#glm( , family=binomial(lin='logit'), data = INEC)
+a1mat = matrix(NA, nrow = 12, ncol=2)
+rownames(a1mat) <- c("Female","F s.e.",
+                     "Age","A s.e.",
+                     "2. Quintile","2nd Q s.e.",
+                     "3. Quintile","3rd Q s.e.",
+                     "4. Quintile","4th Q s.e.",
+                     "5. Quintile","5th Q s.e.")
+colnames(a1mat) <- c("Population 1","Population 2")
+
+INEC <- INEC %>% mutate(protestant = ifelse(RE02==2|RE02==10|RE02==11|RE02==12 ,1, 0))
+INEC <- INEC %>% mutate(religious = RE03)
+INEC$religious <- replace(INEC$religious, INEC$religious==99, NA)
+INEC <- INEC %>% mutate(female = p02 == 2)
+INEC <- INEC %>% mutate(mother = female == 1 & (p04==1 | p04 == 2))
+INEC <- INEC %>% mutate(age = p03)
+INEC <- INEC %>% mutate(samp = ciudad == 90150 | ciudad == 170150)
+
+
+#make the quintiles in binaries
+INEC <- dummy_cols(INEC, select_columns = 'Quintiles', remove_first_dummy = TRUE)
+
+
+#WTF, they didnt even do logistic regression....
+m1 <- lm(protestant ~ female + age, data = INEC %>% filter(samp == 1 & Quintiles == 2))
+#INEC %>% filter(samp == 1 & Quintiles == 2) %>% nrow()
+m2 <- lm(protestant ~ female + age + Quintiles_2 + Quintiles_3 + Quintiles_4 + Quintiles_5, data = INEC %>% filter(!is.na(Quintiles))) %>% summary()
+
+
+
+a1mat[1,1] = m1$coefficients[2]
+a1mat[2,1] = summary(m1)$coefficients[2,2]
+a1mat[3,1] = m1$coefficients[3]  
+a1mat[4,1] = summary(m1)$coefficients[3,2]
+
+a1mat[1,2] = m2$coefficients[2,1]
+a1mat[2,2] = m2$coefficients[2,2]
+a1mat[3,2] = m2$coefficients[3,1]
+a1mat[4,2] = m2$coefficients[3,2]
+a1mat[5,2] = m2$coefficients[4,1]
+a1mat[6,2] = m2$coefficients[4,2]
+a1mat[7,2] = m2$coefficients[5,1]
+a1mat[8,2] = m2$coefficients[5,2]
+a1mat[9,2] = m2$coefficients[6,1]
+a1mat[10,2] = m2$coefficients[6,2]
+a1mat[11,2] = m2$coefficients[7,1]
+a1mat[12,2] = m2$coefficients[7,2]
+#a1mat
+```
+
+```{r star a1, results = 'asis', echo=FALSE, message = FALSE, warning = FALSE}
+stargazer(a1mat,
+          summary = FALSE,
+          rownames = TRUE,
+          colnames = TRUE,
+          header = FALSE)
+```
+
+
+```{r table a4, echo = FALSE, warning=FALSE, message = FALSE}
+
+m11 <- ivreg(protestant ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data %>% filter(score2_1 >= -5 & score2_1 <= 5)) 
+m12 <- ivreg(attendpermonth ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data %>% filter(score2_1 >= -5 & score2_1 <= 5)) 
+m13 <- ivreg(religiousness ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data %>% filter(score2_1 >= -5 & score2_1 <= 5)) 
+
+data2 = data %>% filter(score2_1 >= -4 & score2_1 <= 4)
+m21 <- ivreg(protestant ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data2)
+m22 <- ivreg(attendpermonth ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data2)
+m23 <- ivreg(religiousness ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data2)
+
+data3 = data %>% filter(score2_1 >= -3 & score2_1 <= 3)
+m31 <- ivreg(protestant ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data3) 
+m32 <- ivreg(attendpermonth ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data3)
+m33 <- ivreg(religiousness ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data3)
+
+data4 = data %>% filter(score2_1 >= -2 & score2_1 <= 2)
+m41 <- ivreg(protestant ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data4)
+m42 <- ivreg(attendpermonth ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data4)
+m43 <- ivreg(religiousness ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data4)
+
+data5 = data %>% filter(score2_1 >= -1 & score2_1 <= 1)
+m51 <- ivreg(protestant ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data5) 
+m52 <- ivreg(attendpermonth ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data5) 
+m53 <- ivreg(religiousness ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, 
+        data = data5) 
+
+
+
+a4mat = matrix(0, nrow = 10, ncol=3)
+rownames(a4mat) <- c("Unrestricted","U s.e.","4 points","4p s.e.","3 points","3p s.e.","2 points","2p s.e.","1 point","1p s.e.")
+colnames(a4mat) <- c("Being Evangelical","Attendance","Religousness")
+
+a4mat[1,1]=m11$coefficients[2]
+a4mat[1,2]=m12$coefficients[2]
+a4mat[1,3]=m13$coefficients[2]
+a4mat[2,1]=lmtest::coeftest(m11, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a4mat[2,2]=lmtest::coeftest(m12, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a4mat[2,3]=lmtest::coeftest(m13, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+
+a4mat[3,1]=m21$coefficients[2]
+a4mat[3,2]=m22$coefficients[2]
+a4mat[3,3]=m23$coefficients[2]
+a4mat[4,1]=lmtest::coeftest(m21, vcov. = sandwich::vcovCL, cluster=data2$parroqui,type="HC1")[2,2]
+a4mat[4,2]=lmtest::coeftest(m22, vcov. = sandwich::vcovCL, cluster=data2$parroqui,type="HC1")[2,2]
+a4mat[4,3]=lmtest::coeftest(m23, vcov. = sandwich::vcovCL, cluster=data2$parroqui,type="HC1")[2,2]
+
+a4mat[5,1]=m31$coefficients[2]
+a4mat[5,2]=m32$coefficients[2]
+a4mat[5,3]=m33$coefficients[2]
+a4mat[6,1]=lmtest::coeftest(m31, vcov. = sandwich::vcovCL, cluster=data3$parroqui,type="HC1")[2,2]
+a4mat[6,2]=lmtest::coeftest(m32, vcov. = sandwich::vcovCL, cluster=data3$parroqui,type="HC1")[2,2]
+a4mat[6,3]=lmtest::coeftest(m33, vcov. = sandwich::vcovCL, cluster=data3$parroqui,type="HC1")[2,2]
+
+a4mat[7,1]=m41$coefficients[2]
+a4mat[7,2]=m42$coefficients[2]
+a4mat[7,3]=m43$coefficients[2]
+a4mat[8,1]=lmtest::coeftest(m41, vcov. = sandwich::vcovCL, cluster=data4$parroqui,type="HC1")[2,2]
+a4mat[8,2]=lmtest::coeftest(m42, vcov. = sandwich::vcovCL, cluster=data4$parroqui,type="HC1")[2,2]
+a4mat[8,3]=lmtest::coeftest(m43, vcov. = sandwich::vcovCL, cluster=data4$parroqui,type="HC1")[2,2]
+
+a4mat[9,1]=m51$coefficients[2]
+a4mat[9,2]=m52$coefficients[2]
+a4mat[9,3]=m53$coefficients[2]
+a4mat[10,1]=lmtest::coeftest(m51, vcov. = sandwich::vcovCL, cluster=data5$parroqui,type="HC1")[2,2]
+a4mat[10,2]=lmtest::coeftest(m52, vcov. = sandwich::vcovCL, cluster=data5$parroqui,type="HC1")[2,2]
+a4mat[10,3]=lmtest::coeftest(m53, vcov. = sandwich::vcovCL, cluster=data5$parroqui,type="HC1")[2,2]
+
+#a4mat
+```
+
+```{r star a4, results = 'asis', echo=FALSE, message = FALSE, warning = FALSE}
+stargazer(a4mat,
+          summary = FALSE,
+          rownames = TRUE,
+          colnames = TRUE,
+          header = FALSE)
+```
+
+
+```{r table a5, echo = FALSE, warning=FALSE, message = FALSE}
+a5mat = matrix(NA, nrow = 22, ncol=2)
+rownames(a5mat) <- c("Communal meal","CM s.e.",
+                     "Common purchase of food","CPoF s.e.",
+                     "Work in community workshop","WiCW s.e.",
+                     "Work exchange","WE s.e.",
+                     "Fundraising activities","FA s.e.",
+                     "Communal child care","CCC s.e.",
+                     "Preparation of application for government funds","PoAGF s.e.",
+                     "Communal construction","CC s.e.",
+                     "Property invasion","PI s.e.",
+                     "Security committee","SC s.e.",
+                     "Election campaign","EC s.e.")
+colnames(a5mat) <- c("Participation Rate","Discontinuity")
+
+a5mat[1,1]=mean(data$j15_1==1)
+a5mat[3,1]=mean(data$j15_2==1)
+a5mat[5,1]=mean(data$j15_3==1)
+a5mat[7,1]=mean(data$j15_4==1)
+a5mat[9,1]=mean(data$j15_5==1)
+a5mat[11,1]=mean(data$j15_6==1)
+a5mat[13,1]=mean(data$j15_7==1)
+a5mat[15,1]=mean(data$j15_8==1)
+a5mat[17,1]=mean(data$j15_9==1)
+a5mat[19,1]=mean(data$j15_10==1)
+a5mat[21,1]=mean(data$j15_11==1)
+
+#pull out specific values
+m1 <- ivreg(j15_1==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m2 <- ivreg(j15_2==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m3 <- ivreg(j15_3==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m4 <- ivreg(j15_4==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m5 <- ivreg(j15_5==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m6 <- ivreg(j15_6==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m7 <- ivreg(j15_7==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m8 <- ivreg(j15_8==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m9 <- ivreg(j15_9==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m10 <- ivreg(j15_10==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+m11 <- ivreg(j15_11==1 ~ collect_2 + score2_1 + score2_2 + moremoneyold | score2_1 + score2_2 + moremoneyold + moremoneynew, data = data) 
+
+a5mat[1,2]=m1$coefficients[2]
+a5mat[3,2]=m2$coefficients[2]
+a5mat[5,2]=m3$coefficients[2]
+a5mat[7,2]=m4$coefficients[2]
+a5mat[9,2]=m5$coefficients[2]
+a5mat[11,2]=m6$coefficients[2]
+a5mat[13,2]=m7$coefficients[2]
+a5mat[15,2]=m8$coefficients[2]
+a5mat[17,2]=m9$coefficients[2]
+a5mat[19,2]=m10$coefficients[2]
+a5mat[21,2]=m11$coefficients[2]
+
+a5mat[2,2]=lmtest::coeftest(m1, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[4,2]=lmtest::coeftest(m2, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[6,2]=lmtest::coeftest(m3, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[8,2]=lmtest::coeftest(m4, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[10,2]=lmtest::coeftest(m5, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[12,2]=lmtest::coeftest(m6, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[14,2]=lmtest::coeftest(m7, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[16,2]=lmtest::coeftest(m8, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[18,2]=lmtest::coeftest(m9, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[20,2]=lmtest::coeftest(m10, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+a5mat[22,2]=lmtest::coeftest(m11, vcov. = sandwich::vcovCL, cluster=data$parroqui,type="HC1")[2,2]
+
+#a5mat
+```
+
+```{r star a5, results = 'asis', echo=FALSE, message = FALSE, warning = FALSE}
+stargazer(a5mat,
+          summary = FALSE,
+          rownames = TRUE,
+          colnames = TRUE,
+          header = FALSE)
+```
+
+
+
+
+
+
+
+
